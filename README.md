@@ -1,14 +1,11 @@
 # BIO539_Final
 
-Description of assignment:
+This repository contains:
 
-"This project is meant for you to apply the skills you learned in class to your research.
+1) An RMarkdown file which acted as my analytic "lab notebook". It contains notes on the reasoning/importance of the project, filtering the data, which factors to include in models, and certain plots which were left out from the final analysis and discussion. 
 
-Submit the following:
+2) An R file that contains all the code need to replicate my results. My results are based on analysis of model fitting, model selection, and visual inspection of generated graphics.
 
-1. Exploratory analysis of research data (submitted as an Rmarkdown or Jupyter notebook and including explanations). As with assignment 1, this should look like a lab notebook, full of your thought process, graphical, and statistical output.
+3) The dataset used in the analysis.
 
-
-2. A ~2000 word paper on your research including relevant and significant results from the analysis. The Methods and Results sections should be complete. The Introduction and Discussion sections may be brief.
-
-3. A Github repository, fully commented, with a Readme so that I can replicate the analysis in full."
+4) A final PDF write-up featuring an intorduction, methods, results, discussion, references, tables, and figures.
