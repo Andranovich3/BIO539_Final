@@ -1,0 +1,162 @@
+---
+title: "Andranovich_539_FinalProject"
+author: "Michael Andranovich"
+date: "4/26/2021"
+output: pdf_document
+---
+```{r, include=FALSE}
+
+#Load this packages
+library(akima)
+library(fields)
+library(gvlma)
+library(AICcmodavg)
+
+#Read in the Polar Bear data
+
+data1 = read.csv("PBearMeasurementData_EDITED.csv")
+dim(data1)
+head(data1)
+
+model0 = lm(Mass~1, data = data1)
+model1 = lm(Mass~Age, data = data1)
+model2 = lm(Mass~Total_Length, data = data1)
+model3 = lm(Mass~Heart_Girth, data = data1)
+model4 = lm(Mass~Skull_Width, data = data1)
+modelA = lm(Mass~Population, data = data1)
+modelB = lm(Mass~Years_Since, data = data1)
+modelC = lm(Mass~Sex, data = data1)
+model3C = lm(Mass~Heart_Girth+Sex, data = data1)
+modelAC = lm(Mass~Population+Sex, data = data1)
+model3AC = lm(Mass~Heart_Girth+Population+Sex, data = data1)
+model13AC = lm(Mass~Age+Heart_Girth+Population+Sex, data = data1)
+
+years = c("1983", "1984", "1985", "1986", "1987", "1988", "1989", "1990",
+          "1991", "1992", "1993", "1994", "1996", "1997", "1998",
+          "1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006",
+          "2007", "2008", "2009", "2010", "2011")
+```
+
+# BIO 539 Final Project
+## Analyzing weight data to understand trends of polar bears (Ursus maritimus) captured in the Chukchi and Southern Beaufort Seas (1981 – 2017)
+
+### Abstract
+As one of four marine mammal species managed by the U.S. Department of Interior, polar bears and their population dynamics require long-term research to inform local, state, national and international policy makers regarding conservation of the species and its habitat. Two subpopulations of polar bears, the Chukchi Sea (ranges between the northwest coast of Alaska and eastern Russia) and the Southern Beaufort Sea (ranges between the North Slope of Alaska and western Canada), have been monitored since 1981, providing data on factors like body length, axillary girth, skull width, tail lengths, etc. Our analysis was conducted to better understand predictors for total body mass measurements, focusing on and testing against eight different variables across 1,227 polar bear captures using linear regression modeling and selection based on AIC weights. We also visually examined the trend for polar bear weights by generating a variety of statistical plots based on time and sex. We found that polar bear weights may be trending upwards, or at the very least, not significantly lower than when the study started. Some cause for concern and further research may be needed to isolate the trend of female weights, as they did not show the same gradual rise that male weights did. We also found that the measurement of axillary girth, the circumference of the thorax immediately behind the forelimbs, contributed the most influence when predicting polar bear weights. Morphometric equations to estimate body mass are a powerful tool for monitoring trends in body condition over time, especially for a species like polar bears where it can be difficult to assess whole population trends. Our results show that one factor, which is easy to measure without the need for specialized equipment, can help predict these trends.
+
+### Initial Inspection
+Although these graphics did not make it into my final analysis for their simplicity, I did look at two plots before starting. These plots allowed me to see if the data was trending in the direction I thought it would before getting into the coding and statistics. I plotted my dependent variable (total polar bear mass) by both Age and Length factors, which should show a positive relationship of increasing weight as both increase. As expected, both plots showed this trend and I felt comfortable preceeding knowing that the data was fairly normal and regular.
+
+```{r, echo = FALSE}
+#Plot the response variable (Mass) by the independent variable (Age)
+plot(Mass~Age, data = data1, pch=20, cex=1, xlab = "Age",
+     ylab="Mass", main= "Relationship between Mass and Age")
+```
+
+```{r, echo= FALSE}
+#Plot the response variable (Mass) by the independent variable (Total_Length)
+plot(Mass~Total_Length, data = data1, pch=20, cex=1, xlab = "Total Length",
+     ylab="Mass", main= "Relationship between Mass and Length")
+```
+
+### Filtering Data to For Analysis
+The raw dataset for this study (Rode 2020 [USGS data]) contained an extensive amount of information, which can be both helpful and difficult for analysis. In order to produce a comprehensive list of data points to analyze, we set some filters on the data. To make sure that each model created was using the same amount of data and contained the same factors, we focused on capture records that had complete data entries for our independent variables: population location (SB or CS), year, sex (M or F), approximate age, body length (cm), axillary girth (cm), and skull width (cm). Setting the sex and population factors to corresponding 0s and 1s also helped with mathematical calculations later on. We then created two additional independent variables. "Years Since" calculated when the capture occurred in relation to the beginning of the study (1981), and "Epoch" sorted the capture record into one of three sets of evenly broken up years (1981-1991, 1992-2001, 2002-2011). These types of variables added temporal elements to measure against instead of basic year data. For all aspects of this analysis, the dependent variable was the total body mass (kg) of the polar bear captured. After conducting these filters, we were left with a dataset that contained 1,227 complete entries from the years 1983 to 2011, each with the eight test variables and a total body mass measurement.
+
+```{r}
+#Changing M/F readings to 1 and 0 for easier analysis
+#Female = 0
+#Male = 1
+
+data1$Sex[data1$Sex == "F"] = 0
+data1$Sex[data1$Sex == "M"] = 1
+
+#Changing Populations to 1 and 0 for easier analysis
+#CS = 0
+#SB = 1
+
+data1$Population[data1$Population == "CS"] = 0
+data1$Population[data1$Population == "SB"] = 1
+
+#Creating the "Epoch" factor in the dataset
+MassAVG_byFactors = aggregate(Mass ~ YEAR + Sex + Population, FUN = mean, data = data1)
+
+MassAVG_byFactors$Epoch = MassAVG_byFactors$YEAR
+MassAVG_byFactors$Epoch[MassAVG_byFactors$YEAR < "1992"] <- 1
+MassAVG_byFactors$Epoch[MassAVG_byFactors$YEAR > "1991" & MassAVG_byFactors$YEAR < "2002"] <- 2
+MassAVG_byFactors$Epoch[MassAVG_byFactors$YEAR > "2001"] <- 3
+```
+
+### Model Creation and Fitting
+While researching to see which morphometric, location, or time-based trait had the greatest predictive effect on body mass, I created twelve different models. Most models were simple, containing only one independent variable; however, some were more complicated. The more complicated models were created after the first batch because I wanted to see which single factor had the highest coefficient of determination ($R^2$). Based on coefficients of determinations, we can conclude that morphological factors rather than location or time-based factors play the greatest influence on predicting polar bear weights, as the three highest $R^2$ values were results of axillary girth, skull width, and total length, respectively. Axillary girth produced the highest value at 0.875, which shows that about 87.5% of the variation can be explained by the data. Because of this, I included axillary girth in almost all of the models that contained two or more factors.
+
+$$
+model0 = lm(Mass~1, data = data1)
+$$
+$$
+model1 = lm(Mass~Age, data = data1)
+$$
+$$
+model2 = lm(Mass~Total_Length, data = data1)
+$$
+$$
+model3 = lm(Mass~Heart_Girth, data = data1)
+$$
+$$
+model4 = lm(Mass~Skull_Width, data = data1)
+$$
+$$
+modelA = lm(Mass~Population, data = data1)
+$$
+$$
+modelB = lm(Mass~Years_Since, data = data1)
+$$
+$$
+modelC = lm(Mass~Sex, data = data1)
+$$
+$$
+model3C = lm(Mass~Heart_Girth+Sex, data = data1)
+$$
+$$
+modelAC = lm(Mass~Population+Sex, data = data1)
+$$
+$$
+model3AC = lm(Mass~Heart_Girth+Population+Sex, data = data1)
+$$
+$$
+model13AC = lm(Mass~Age+Heart_Girth+Population+Sex, data = data1)
+$$
+
+### AIC Table and Model Selection
+The model selection of this analysis was conducted to better understand which morphological factor in polar bears contributed as the best predictor for body mass. Although twelve models were created, some results contributed much more significant results. Model 0, which represented a null model of no effect, shows us that the average weight of a polar bear capture during this study would be about 187 kilograms if there were no influences from other factors. In all models which fit for one factor, only one factor was proven to not be statistically significant based on its p-value if we were estimating to 95% confidence: Population. Reasons why this may be true will be discussed in the next section, but it should be noted that the results of that model showed that on average, polar bears from the Southern Beaufort Sea were about 22.2 kilograms heavier. In Model 13AC, the most complicated of the models fitted, we received the highest multiple $R^2$ value; however, it should be noted that with a finite amount of observed data, every time we add another independent variable, we need to estimate another parameter. Because of this, a trade-off occurs where the uncertainty of our estimates will get bigger, but our bias, the difference between the model and truth, will go down.
+
+```{r}
+
+#Package all the models fitted into a list
+modelList = list(model0, model1, model2, model3, model4, modelA,
+                 modelB, modelC, model3C, modelAC, model3AC, model13AC)
+
+#Add the names of each model, in the order they are listed in modelList
+Modnames = c("Null Model", "Age Model", "Total_Length Model", "Heart_Girth Model",
+             "Skull_Width Model", "Population Model", "Study Duration Model",
+             "Sex Model", "Heart + Sex Model", "Population+Sex Model",
+             "Heart+Pop+Sex Model", "Age+Heart+Pop+Sex Model")
+
+#Construct the AIC table and output it as a csv file, which you can use in a report
+aicTable1 = aictab(modelList, Modnames, digits=4)
+aicTable1
+
+```
+
+### Visualizing Data Changes through graphs
+Visually examining data in plots is a good way to understand how populations may be trending without having to analyze critical datasets. Because our sample size for this analysis is sufficiently large (n > 1000), it is possible to glean information from these plots. In the first graph, I compared the three epochs, but with the added factor of grouping the results by polar bear sex. This allowed me to see if the change over the course of an epoch was similar for both sexes of polar bears, and if one had a greater influence than the other. This plot showed that the weights of male polar bears increased as the study went on but showed a larger amount of variability than female polar bear weights. Because of this, further testing would need to be completed to see if the change in male polar bear weights was statistically significant, or if the change could be explained by random variation in the sampling pattern.
+
+Unfortunately, I made a mistake with the other two charts and am not able to reproduce them here because I (naively) deleted the line of code which created the MassAVG_byYear object. Because of this, I will need to do some testing to see how I created this object in the first place.
+
+```{r fig.cap= "Average Body Mass by Sex and Epoch", echo = FALSE}
+boxplot(Mass ~ Sex + Epoch, xaxt = "n",
+        xlab = "Sex + Epoch", ylab = "Body Mass (kg)",
+        main = "Comparison of Average Body Mass\n by Sex and Epoch",
+        data = MassAVG_byFactors)
+axis(1, at = c(1:6), labels = c("Female\n1983-1991", "Male\n1983-1991",
+                                "Female\n1992-2001", "Male\n1992-2001",
+                                "Female\n2002-2011", "Male\n2002-2011"))
+```
